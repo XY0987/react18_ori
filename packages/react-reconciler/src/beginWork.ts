@@ -55,20 +55,24 @@ function updateFragment(wip: FiberNode) {
 	return wip.child;
 }
 
-//函数式组件
+/** 函数组件更新：先执行组件函数得到 children，再对 children 做 reconcile。 */
 function updateFunctionComponent(wip: FiberNode, renderLane: Lane) {
 	const nextChildren = renderWithHooks(wip, renderLane);
 	reconcileChildren(wip, nextChildren);
 	return wip.child;
 }
 
+/**
+ * HostRoot 更新：消费 root 上的 updateQueue。
+ *
+ * 对首屏渲染来说，update.action 就是传给 render 的 ReactElement。
+ * processUpdateQueue 计算出的 memoizedState 会作为 HostRoot 的 children 继续向下构建 Fiber。
+ */
 function updateHostRoot(wip: FiberNode, renderLane: Lane) {
 	const baseState = wip.memoizedState;
 	const updateQueue = wip.updateQueue as UpdateQueue<Element>;
 	const pending = updateQueue.shared.pending;
-	// 这里由于是首屏渲染，所以不可能被中断
 	updateQueue.shared.pending = null;
-	// 根据旧值获取到最新值
 	const { memoizedState } = processUpdateQueue(baseState, pending, renderLane);
 	wip.memoizedState = memoizedState;
 
@@ -77,6 +81,7 @@ function updateHostRoot(wip: FiberNode, renderLane: Lane) {
 	return wip.child;
 }
 
+/** 原生 DOM 节点更新：取 props.children 继续向下 reconcile，并检查 ref 是否变化。 */
 function updateHostComponent(wip: FiberNode) {
 	const nextProps = wip.pendingProps;
 	const nextChildren = nextProps.children;
@@ -85,7 +90,7 @@ function updateHostComponent(wip: FiberNode) {
 	return wip.child;
 }
 
-// 控制是更新还是挂载（这两个方法是标记对应节点的）
+/** 根据 current（即 wip.alternate）是否存在来区分 mount 和 update，选择是否追踪副作用 flags。 */
 function reconcileChildren(wip: FiberNode, children?: ReactElementType) {
 	const current = wip.alternate;
 	if (current !== null) {
@@ -103,7 +108,7 @@ function markRef(current: FiberNode | null, workInProgress: FiberNode) {
 		(current === null && ref !== null) ||
 		(current !== null && current.ref !== ref)
 	) {
-		// mount时存在ref,update时ref引用存在变化
+		// mount 时存在 ref，update 时 ref 引用发生变化
 		workInProgress.flags |= Ref;
 	}
 }

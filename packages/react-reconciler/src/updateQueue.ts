@@ -3,20 +3,24 @@ import { Action } from 'shared/ReactTypes';
 import { Lane, NoLane, isSubsetOfLanes } from './fiberLanes';
 
 export interface Update<State> {
+	/** setState 传入的值或函数；HostRoot 场景下是要渲染的 ReactElement。 */
 	action: Action<State>;
+	/** 本次更新所属优先级，render 时只有优先级足够的 update 才会被消费。 */
 	lane: Lane;
+	/** updateQueue 使用环状链表，next 指向下一个 update。 */
 	next: Update<any> | null;
 }
 
 export interface UpdateQueue<State> {
 	shared: {
+		/** 指向环状链表中最后插入的 update，pending.next 才是第一个 update。 */
 		pending: Update<State> | null;
 	};
-	// dispatch用于hook的更新
+	// dispatch 用于 hook 更新；HostRoot 的 updateQueue 不需要 dispatch。
 	dispatch: Dispatch<State> | null;
 }
 
-// 创建update
+/** 创建一次更新。 */
 export const createUpdate = <State>(
 	action: Action<State>,
 	lane: Lane
@@ -28,7 +32,7 @@ export const createUpdate = <State>(
 	};
 };
 
-// 创建updateQueue
+/** 创建更新队列。 */
 export const createUpdateQueue = <State>() => {
 	return {
 		shared: {
@@ -38,28 +42,32 @@ export const createUpdateQueue = <State>() => {
 	} as UpdateQueue<State>;
 };
 
-// 往updateQueue添加update
+/**
+ * 将 update 追加到环状链表尾部。
+ *
+ * 使用环状链表的好处是：只保存最后一个 pending update，也能通过 pending.next 快速找到第一个 update。
+ */
 export const enqueueUpdate = <State>(
 	updateQueue: UpdateQueue<State>,
 	update: Update<State>
 ) => {
-	// 这种是覆盖操作，多次调用每次都会重新赋值
-	// updateQueue.shared.pending = update;
 	const pending = updateQueue.shared.pending;
 	if (pending === null) {
-		// 会形成一个环状链表,a->a
+		// 首个 update 自己指向自己，形成 a -> a 的环。
 		update.next = update;
 	} else {
-		// b.next=b
+		// 新 update 插入到 pending 和 pending.next 之间，成为新的尾节点。
 		update.next = pending.next;
-		// a.next=b
 		pending.next = update;
 	}
-	// pending=b=>a=>b
 	updateQueue.shared.pending = update;
 };
 
-// 消费upodate的方法
+/**
+ * 消费 updateQueue，计算本次 render 应得到的最新状态。
+ *
+ * 优先级不足的 update 不会丢弃，而是克隆到 baseQueue 中，等待后续更合适的 renderLane 再处理。
+ */
 export const processUpdateQueue = <State>(
 	baseState: State,
 	pendingUpdate: Update<State> | null,
@@ -69,7 +77,11 @@ export const processUpdateQueue = <State>(
 	baseState: State;
 	baseQueue: Update<State> | null;
 } => {
-	const result: ReturnType<typeof processUpdateQueue<State>> = {
+	const result: {
+		memoizedState: State;
+		baseState: State;
+		baseQueue: Update<State> | null;
+	} = {
 		memoizedState: baseState,
 		baseState: baseState,
 		baseQueue: null
@@ -111,11 +123,12 @@ export const processUpdateQueue = <State>(
 				// 传递的一种是值，另一种是一个函数
 				const action = pending.action;
 				if (action instanceof Function) {
-					/* 
-					setState传函数和传值不同的点就在这里，多次更新传函数时
-					baseState的值一直都会改变，而传值时只会赋值
-					*/
-					newState = action(baseState);
+			/* 
+				setState传函数和传值不同的点就在这里，多次更新传函数时
+				newState的值一直都会改变，而传值时只会赋值。
+				注意：这里应基于 newState（前一个 update 的累积值）而非 baseState 来计算。
+				*/
+				newState = action(newState);
 				} else {
 					newState = action;
 				}

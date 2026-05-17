@@ -30,6 +30,14 @@ import { HookHasEffect } from './hookEffectTags';
 
 let nextEffect: FiberNode | null = null;
 
+/**
+ * commit 阶段通用副作用遍历器。
+ *
+ * render 阶段已经通过 bubbleProperties 把子树副作用汇总到 subtreeFlags。
+ * 因此 commit 阶段可以先看 subtreeFlags：
+ * - 子树有目标副作用，就继续向下找；
+ * - 子树没有目标副作用，就执行当前 Fiber 的 callback，并尝试找兄弟或向上回溯。
+ */
 export const commitEffects = (
 	phrase: 'mutation' | 'layout',
 	mask: Flags,
@@ -88,6 +96,7 @@ export const commitEffects = (
 // 	}
 // };
 
+/** mutation 阶段处理单个 Fiber 上的 DOM 类副作用。 */
 const commitMutationEffectsOnFiber = (
 	finishedWork: FiberNode,
 	root: FiberRootNode
@@ -120,13 +129,13 @@ const commitMutationEffectsOnFiber = (
 		finishedWork.flags &= ~ChildDeletion;
 	}
 	if ((flags & PassiveEffect) !== NoFlags) {
-		// 收集回调
+		// useEffect 不在 mutation 阶段立即执行，这里只收集到 root.pendingPassiveEffects。
 		commitPassiveEffect(finishedWork, root, 'update');
 		finishedWork.flags &= ~PassiveEffect;
 	}
 
 	if ((flags & Ref) !== NoFlags) {
-		// 解绑之前的ref
+		// ref 的旧值先在 mutation 阶段解绑，新值会在 layout 阶段绑定。
 		safelyDetachRef(finishedWork);
 	}
 };
@@ -178,7 +187,12 @@ export const commitLayoutEffects = commitEffects(
 	commitLayoutEffectsOnFiber
 );
 
-// type表示是create还是update
+/**
+ * 收集 passive effect。
+ *
+ * useEffect 的 destroy/create 不会在 mutation 阶段同步执行，
+ * 这里只把函数组件的 effect 环状链表挂到 root.pendingPassiveEffects，之后由 flushPassiveEffects 统一处理。
+ */
 function commitPassiveEffect(
 	fiber: FiberNode,
 	root: FiberRootNode,
@@ -201,6 +215,7 @@ function commitPassiveEffect(
 	}
 }
 
+/** 遍历 effect 环状链表，只处理 tag 命中的 effect。 */
 function commitHookEffectList(
 	flags: Flags,
 	lastEffect: Effect,
@@ -255,7 +270,7 @@ function recordHostChildrenToDelete(
 	if (!lastOne) {
 		childrenToDelete.push(unmountFiber);
 	} else {
-		// 不是第一个，把所有的兄弟节点都加入到对应数组中，之后统一删除（Fragement相当于一个组件，需要把里边的节点都删除）
+		// 不是第一个，把所有的兄弟节点都加入到对应数组中，之后统一删除（Fragment 相当于一个组件，需要把里边的节点都删除）
 		let node = lastOne.sibling;
 		while (node !== null) {
 			if (unmountFiber === node) {
@@ -264,10 +279,17 @@ function recordHostChildrenToDelete(
 			node = node.sibling;
 		}
 	}
-	// 2. 每找到一个host节点，判断下这个节点是不是 1 找到哪个节点的兄弟节点
+	// 2. 每找到一个 host 节点，判断它是否是第 1 步找到的那个节点的兄弟节点
 }
 
-// 递归处理，根据不同类型进行额外的处理
+/**
+ * 删除子树。
+ *
+ * 需要做的不只是 removeChild：
+ * - 找到子树中所有真实 Host 节点并从宿主父节点移除；
+ * - 对 HostComponent 解绑 ref；
+ * - 对 FunctionComponent 收集 unmount passive effect。
+ */
 function commitDeletion(childToDelete: FiberNode, root: FiberRootNode) {
 	const rootChildrenToDelete: FiberNode[] = [];
 	// 递归子树
@@ -289,8 +311,8 @@ function commitDeletion(childToDelete: FiberNode, root: FiberRootNode) {
 				recordHostChildrenToDelete(rootChildrenToDelete, unmountFiber);
 				return;
 			case FunctionComponent:
-				// TODO: useEffect unmount的处理
-				commitPassiveEffect(unmountFiber, root, 'unmount');
+			// useEffect unmount 的处理：收集 unmount passive effect
+			commitPassiveEffect(unmountFiber, root, 'unmount');
 				return;
 			default:
 				if (__DEV__) {
@@ -344,23 +366,26 @@ function commitNestedComponent(
 	}
 }
 
+/**
+ * 执行 Placement：找到宿主父节点和稳定兄弟节点，然后插入真实 DOM。
+ *
+ * 注意 finishedWork 可能是函数组件或 Fragment，本身没有 DOM，
+ * 所以后续 insertOrAppendPlacementNodeIntoContainer 会向下找到真正的 Host 节点。
+ */
 const commitPlacement = (finishedWork: FiberNode) => {
-	// 找到父节点（插入到哪里）
-	// 找到对应的节点
 	if (__DEV__) {
 		console.warn('执行Placement操作', finishedWork);
 	}
 	const hostParent = getHostParent(finishedWork);
 
-	// host sibling
 	const sibling = getHostSibling(finishedWork);
 
-	// 将dom插入到对应的节点中
 	if (hostParent !== null) {
 		insertOrAppendPlacementNodeIntoContainer(finishedWork, hostParent, sibling);
 	}
 };
 
+/** 寻找可以作为 insertBefore 参照物的稳定宿主兄弟节点。 */
 function getHostSibling(fiber: FiberNode) {
 	let node: FiberNode = fiber;
 	findSibling: while (true) {

@@ -6,15 +6,17 @@ export type WorkTag =
 	| typeof Fragment
 	| typeof ContextProvider;
 
-// 函数类型节点
+// 函数组件 Fiber，对应 function App() {}。
 export const FunctionComponent = 0;
-// 挂载的根节点
+// 整棵 Fiber 树的根节点，对应 FiberRootNode.current。
 export const HostRoot = 3;
-// 组件的根节点
+// 原生宿主节点，在 DOM renderer 中对应 div/span 等 DOM Element。
 export const HostComponent = 5;
-//
+// 文本节点，在 DOM renderer 中对应 Text。
 export const HostText = 6;
 
+// Fragment 本身不产生宿主节点，只承载一组 children。
 export const Fragment = 7;
 
+// Context.Provider 对应的 Fiber 类型。
 export const ContextProvider = 8;

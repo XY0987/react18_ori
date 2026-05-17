@@ -17,32 +17,35 @@ import { Lane, NoLane, requestUpdateLane } from './fiberLanes';
 import { Flags, PassiveEffect } from './fiberFlags';
 import { HookHasEffect, Passive } from './hookEffectTags';
 
-// 当前正在处理的fiber树（函数组件）
+// 当前正在执行的函数组件 Fiber。只有 renderWithHooks 期间它才有值。
 let currentlyRenderingFiber: FiberNode | null = null;
-// 指向当前正在执行的hook
+// 指向 workInProgress Hook 链表中当前正在构建的 Hook。
 let workInProgressHook: Hook | null = null;
 
-// 更新时用于获取hook数据的全局变量
+// update 阶段用于遍历 current Hook 链表，保证本次 Hook 顺序与上次一致。
 let currentHook: Hook | null = null;
 
 const { currentDispatcher } = internals;
 
 let renderLane: Lane = NoLane;
 interface Hook {
-	// fiber中的memoizedState保存的是hook链表，而hook中的memoizedState是保存的对应的值
+	/** 当前 Hook 保存的值：useState 是 state，useEffect 是 effect，useRef 是 ref 对象。 */
 	memoizedState: any;
+	/** useState 的 updateQueue 或其他 Hook 需要保存的队列。 */
 	updateQueue: unknown;
+	/** 下一个 Hook，函数组件的所有 Hook 通过 next 串成单链表。 */
 	next: Hook | null;
+	/** 跳过低优先级更新后，下次重新计算的基础 state。 */
 	baseState: any;
+	/** 本次 render 因优先级不足而跳过的 update 队列。 */
 	baseQueue: Update<any> | null;
 }
 
-/* 
-除了hook会形成一个链表，为了更好的遍历
-useEffect也会单独形成一个链表
-这里的next字段指向的是下一个effect
-而hook中的next字段指向的是下一个hook
-*/
+/**
+ * useEffect 也会形成一条独立的环状链表。
+ *
+ * 注意这里的 next 指向下一个 effect，Hook.next 指向下一个 Hook，二者是两条不同链表。
+ */
 export interface Effect {
 	tag: Flags;
 	create: EffectCallback | void;
@@ -60,6 +63,15 @@ type EffectCallback = () => void;
 
 type EffectDeps = any[] | null;
 
+/**
+ * 函数组件 render 入口。
+ *
+ * renderWithHooks 会在执行组件函数前设置全局 Hook 上下文：
+ * - mount 阶段使用 HooksDispatcherOnMount 创建 Hook 链表；
+ * - update 阶段使用 HooksDispatcherOnUpdate 复用旧 Hook 并计算新状态。
+ *
+ * 组件函数执行结束后必须重置这些全局变量，防止 Hook 在组件外被错误调用。
+ */
 export function renderWithHooks(wip: FiberNode, lane: Lane) {
 	// 赋值操作
 	currentlyRenderingFiber = wip;
@@ -245,6 +257,7 @@ function createFCUpdateQueue<State>() {
 	return updateQueue;
 }
 
+/** update 阶段的 useState：复用旧 Hook，并消费 pending/baseQueue 计算新 state。 */
 function updateState<State>(): [State, Dispatch<State>] {
 	// 找到当前useState对应的Hook数据
 	const hook = updateWorkInProgresHook();
@@ -258,11 +271,8 @@ function updateState<State>(): [State, Dispatch<State>] {
 	const current = currentHook as Hook;
 	let baseQueue = current.baseQueue;
 
-	// 将pending置空, 这里因为更新可能被中断，所以不能直接赋值为null
-	// queue.shared.pending = null;
-
 	if (pending !== null) {
-		// pending baseQueue update保存在current中
+		// 将本轮新产生的 pending 队列接到上次遗留的 baseQueue 后面，保证更新顺序不丢失。
 		if (baseQueue !== null) {
 			const baseFirst = baseQueue.next;
 			const pengdingFirst = pending.next;
@@ -292,7 +302,7 @@ function updateWorkInProgresHook(): Hook {
 	// TODO: render阶段的更新
 	let nextCurrentHook: Hook | null;
 	if (currentHook === null) {
-		// 这个时FC update时的第一个hook
+		// 这是 FC update 时的第一个 hook
 		const current = currentlyRenderingFiber?.alternate;
 		if (current !== null) {
 			nextCurrentHook = current?.memoizedState;
@@ -300,7 +310,7 @@ function updateWorkInProgresHook(): Hook {
 			nextCurrentHook = null;
 		}
 	} else {
-		// 这个FC update时后续的Hook
+		// 这是 FC update 时后续的 Hook
 		nextCurrentHook = currentHook.next;
 	}
 
@@ -321,17 +331,17 @@ function updateWorkInProgresHook(): Hook {
 		baseState: currentHook.baseState
 	};
 	if (workInProgressHook === null) {
-		// mount 并且是第一个hook
+		// update 阶段的第一个 hook
 		if (currentlyRenderingFiber === null) {
 			// 没有在函数组件内调用hook(当前指向的fiber树为null)
 			throw new Error('请在函数组件内调用Hook');
 		} else {
 			workInProgressHook = newHook;
-			// mount的第一个hook
+			// update 的第一个 hook，挂到 fiber.memoizedState 上
 			currentlyRenderingFiber.memoizedState = workInProgressHook;
 		}
 	} else {
-		// mount 后续的hook(使用链表的方式连接起来)
+		// update 后续的 hook（使用链表的方式连接起来）
 		workInProgressHook.next = newHook;
 		// 更新hook的指向
 		workInProgressHook = newHook;
@@ -339,6 +349,7 @@ function updateWorkInProgresHook(): Hook {
 	return workInProgressHook;
 }
 
+/** mount 阶段的 useState：创建 Hook、初始化 state，并绑定 dispatch。 */
 function mountState<State>(
 	initialState: (() => State) | State
 ): [State, Dispatch<State>] {
@@ -363,7 +374,7 @@ function mountState<State>(
 	return [memoizedState, dispatch];
 }
 
-// 返回第一个参数是是否在更新中，第二个是一个函数
+// 返回第一个参数是是否在更新中（isPending），第二个是 startTransition 函数
 function mountTransition(): [boolean, (callback: () => void) => void] {
 	const [isPending, setPending] = mountState(false);
 	const hook = mountWorkInProgresHook();
@@ -404,7 +415,7 @@ function updateRef<T>(): { current: T } {
 	return hook.memoizedState;
 }
 
-// 触发更新
+/** dispatch(setState) 入口：创建 update，入队，然后从当前 Fiber 调度到 root。 */
 function disPatchSetState<State>(
 	fiber: FiberNode,
 	updateQueue: UpdateQueue<State>,
@@ -417,7 +428,7 @@ function disPatchSetState<State>(
 	scheduleUpdateOnFiber(fiber, lane);
 }
 
-// 生成一个hook链表
+/** mount 阶段创建 Hook，并挂到 currentlyRenderingFiber.memoizedState 链表上。 */
 function mountWorkInProgresHook(): Hook {
 	const hook: Hook = {
 		memoizedState: null,

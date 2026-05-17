@@ -13,45 +13,57 @@ import { Effect } from './fiberHooks';
 import { CallbackNode } from 'scheduler';
 import { REACT_PROVIDER_TYPE } from 'shared/ReactSymbols';
 
-/* 
-协调器的工作方式：对于同一个节点，比较其React Element与FiberNode生成子fibrtnode
-并根据比较的结果生成不同标记（插入、删除、移动....）
-对应不同的宿主环境API执行 
-
-
-
-JSX消费的顺序（采用DFS深度优先遍历的方式遍历React Element）
+/*
+协调器的核心任务：
+1. 将 ReactElement 转换为 FiberNode；
+2. 以深度优先遍历的方式比较 current 树和 workInProgress 树；
+3. 在 FiberNode 上收集 Placement、Update、ChildDeletion 等副作用标记；
+4. commit 阶段再根据这些标记调用宿主环境 API 更新真实 UI。
 */
 
 export class FiberNode {
+	/** 节点类型：函数组件、原生 DOM 节点、文本节点、HostRoot 等。 */
 	tag: WorkTag;
+	/** ReactElement.key，用于同级子节点 diff 复用。 */
 	key: Key;
+	/** 宿主实例或根节点状态：HostComponent 对应 DOM，HostRoot 对应 FiberRootNode。 */
 	stateNode: any;
+	/** 组件类型：HostComponent 是标签名，FunctionComponent 是函数本身。 */
 	type: any;
+	/** 本轮 render 输入的新 props。 */
 	pendingProps: Props;
 
+	/** 父 Fiber。 */
 	return: FiberNode | null;
+	/** 下一个兄弟 Fiber。 */
 	sibling: FiberNode | null;
+	/** 第一个子 Fiber。 */
 	child: FiberNode | null;
+	/** 当前 Fiber 在同级列表中的位置，用于数组 diff 判断移动。 */
 	index: number;
 
 	ref: Ref;
 
+	/** 上一次完成 render 后记录的 props。 */
 	memoizedProps: Props | null;
+	/** 上一次完成 render 后记录的 state；函数组件中保存 Hook 链表头。 */
 	memoizedState: any;
-	//两个FiberNode树切换的字段（current或workInProgress，用于切换两个树）
+	/** 双缓冲指针：current 与 workInProgress 通过 alternate 互相连接。 */
 	alternate: FiberNode | null;
-	// 保存对应的标记(删除、新增、更新...)
+	/** 当前 Fiber 自身的副作用标记。 */
 	flags: Flags;
+	/** 子树中所有副作用标记的汇总，用于 commit 阶段快速跳过无副作用子树。 */
 	subtreeFlags: Flags;
 
+	/** HostRoot/useState/useEffect 等都会借助 updateQueue 保存更新或 effect。 */
 	updateQueue: unknown;
-	deletions: FiberNode[] | null; //要删除的子节点
+	/** commit 阶段需要删除的子节点集合。 */
+	deletions: FiberNode[] | null;
 
 	constructor(tag: WorkTag, pendingProps: Props, key: Key) {
 		this.tag = tag;
 		this.key = key || null;
-		// 如果是HostComponent 这个属性就相当于组件根节点的fiber
+		// 如果是 HostComponent，保存的是对应的 DOM 实例；如果是 HostRoot，保存的是 FiberRootNode
 		this.stateNode = null;
 		// 如果是FunctionComponent，它对应的就是函数本身
 		this.type = null;
@@ -81,28 +93,34 @@ export class FiberNode {
 }
 
 export interface PendingPassiveEffects {
+	/** 组件卸载时需要执行 destroy 的 effect。 */
 	unmount: Effect[];
+	/** 组件更新时需要先 destroy 再 create 的 effect。 */
 	update: Effect[];
 }
 
 export class FiberRootNode {
+	/** 宿主容器，例如 DOM renderer 中的根 DOM 节点。 */
 	container: Container;
+	/** 当前屏幕上已经提交的 Fiber 树。 */
 	current: FiberNode;
+	/** render 阶段完成后等待 commit 的 workInProgress 树。 */
 	finishedWork: FiberNode | null;
-	// 所有没有被消费的lane的集合
+	/** root 上所有还没被消费的 lane 集合。 */
 	pendingLanes: Lanes;
-	// 本次更新消费的lane
+	/** 本次 finishedWork 对应消费的 lane。 */
 	finishedLane: Lane;
+	/** commit 后异步执行的 passive effect 队列。 */
 	pendingPassiveEffects: PendingPassiveEffects;
 
-	// 回调函数
+	/** Scheduler 返回的回调节点，用于取消或复用已调度任务。 */
 	callbackNode: CallbackNode | null;
-	// 优先级
+	/** 当前已调度任务的优先级。 */
 	callbackPriority: Lane;
 	constructor(container: Container, hostRootFiber: FiberNode) {
 		this.container = container;
 		this.current = hostRootFiber;
-		// 当前为HostComponent,指向自身
+		// HostRoot Fiber 通过 stateNode 反向指向 FiberRootNode，便于从任意 Fiber 向上找到 root。
 		hostRootFiber.stateNode = this;
 		this.finishedWork = null;
 		this.pendingLanes = NoLanes;
@@ -118,7 +136,15 @@ export class FiberRootNode {
 	}
 }
 
-// 创建双缓存树
+/**
+ * 创建或复用 workInProgress Fiber。
+ *
+ * 双缓冲模型中，同一个逻辑节点最多有两份 Fiber：
+ * - current：当前页面正在使用的树；
+ * - workInProgress：本轮 render 正在构建的新树。
+ *
+ * 首次更新时创建 alternate，后续更新复用 alternate 并清理上一轮副作用标记。
+ */
 export const createWorkInProgress = (
 	current: FiberNode,
 	pendingProps: Props

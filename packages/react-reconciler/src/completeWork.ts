@@ -17,15 +17,24 @@ import { NoFlags, Ref, Update } from './fiberFlags';
 import { updateFiberProps } from 'react-dom/src/SyntheticEvent';
 import { popProvider } from './fiberContext';
 
-// 标记更新函数
+/** 标记当前 Fiber 在 commit mutation 阶段需要执行更新。 */
 function markUpdate(fiber: FiberNode) {
 	fiber.flags |= Update;
 }
 
+/** 标记当前 Fiber 在 commit 阶段需要处理 ref 解绑/绑定。 */
 function markRef(fiber: FiberNode) {
 	fiber.flags |= Ref;
 }
 
+/**
+ * render 阶段的“归”阶段。
+ *
+ * completeWork 的核心职责：
+ * - mount 时创建离屏 DOM 实例，并把子孙 DOM 挂到当前 DOM 上；
+ * - update 时比较文本、ref 等变化并打 flags；
+ * - 最后把子树 flags 冒泡到父 Fiber，方便 commit 阶段快速定位副作用。
+ */
 export const completeWork = (wip: FiberNode) => {
 	// 递归中的归
 	const newProps = wip.pendingProps;
@@ -44,7 +53,7 @@ export const completeWork = (wip: FiberNode) => {
 			} else {
 				//1. 构建DOM
 				const instance = createInstance(wip.type, newProps);
-				//2. 将DOM插入到DOM树种
+				//2. 将DOM插入到DOM树中
 				appendAllChildren(instance, wip);
 				wip.stateNode = instance;
 				// 标记ref
@@ -86,13 +95,13 @@ export const completeWork = (wip: FiberNode) => {
 			return null;
 		default:
 			if (__DEV__) {
-				console.warn('未处理的complework情况');
+				console.warn('未处理的completeWork情况');
 			}
 			break;
 	}
 };
 
-// 将节点插入到parent种
+// 将节点插入到parent中
 function appendAllChildren(parent: Container, wip: FiberNode) {
 	let node = wip.child;
 	while (node !== null) {

@@ -1,5 +1,5 @@
-// 用于指定是那种effect(effect分为三种：useEffect、useLayoutEffect、useInsertionEffect)
-export const Passive = 0b0010; //表示useEffect
+// effect 类型标记。当前实现只支持 useEffect，对应 Passive。
+export const Passive = 0b0010;
 
-// 表示需要执行对应的effect
+// 本次 commit 是否需要执行该 effect 的 destroy/create。
 export const HookHasEffect = 0b0001;

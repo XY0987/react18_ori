@@ -37,7 +37,12 @@ export function isValidElement(object: any) {
 	);
 }
 
-// 实现JSX方法
+/**
+ * JSX runtime 入口。
+ *
+ * 编译器会把 `<div id="a">hello</div>` 转成 jsx(type, config, children) 调用。
+ * key/ref 是 React 的保留字段，不会放入 props；其余字段都会收集到 props 中。
+ */
 export const jsx = function (
 	type: ElementType,
 	config: any,

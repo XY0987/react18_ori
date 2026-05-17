@@ -1,6 +1,9 @@
-/* 
-事件的绑定是代理到容器中，然后根据触发事件的元素，不断收集其父元素的相关事件，然后再触发相关事件
-声明两个数组，一个是冒泡阶段执行的函数，另一个是捕获阶段执行的函数
+/*
+React 合成事件的核心思路：
+1. 事件不直接绑在每个 DOM 节点上，而是委托到根容器；
+2. 真实事件触发后，从 target 向上收集捕获/冒泡阶段的回调；
+3. 构造合成事件对象，按捕获 -> 冒泡的顺序执行；
+4. 执行事件回调时切换到对应 Scheduler 优先级，让事件更新进入正确的 lane。
 */
 
 import { Container } from 'hostConfig';
@@ -32,10 +35,16 @@ export interface DOMElement extends Element {
 	[elementPropsKey]: Props;
 }
 
+/**
+ * 将最新 props 缓存在 DOM 节点上。
+ *
+ * commit 阶段更新 DOM props 后，事件系统才能从真实事件 target 上读到最新的事件回调。
+ */
 export function updateFiberProps(node: DOMElement, props: Props) {
 	node[elementPropsKey] = props;
 }
 
+/** 在根容器上注册事件委托监听。 */
 export function initEvent(container: Container, eventType: string) {
 	if (!validEventTypeList.includes(eventType)) {
 		console.warn(`当前不支持${eventType}事件`);
@@ -49,7 +58,7 @@ export function initEvent(container: Container, eventType: string) {
 	});
 }
 
-// 构造合成事件
+/** 构造合成事件，并接管 stopPropagation，保证 React 自己的事件流也能被中断。 */
 function createSyntheticEvent(e: Event) {
 	const syntheticEvent = e as SyntheticEvent;
 	syntheticEvent.__stopPropagation = false;
@@ -71,23 +80,24 @@ function dispatchEvent(container: Container, eventType: string, e: Event) {
 		return;
 	}
 
-	// 1. 收集沿途的事件
+	// 从真实 target 向上收集 React props 上声明的捕获/冒泡回调。
 	const { bubble, capture } = collectPaths(
 		targetElement as DOMElement,
 		container,
 		eventType
 	);
-	// 2. 构造合成事件
+	// 构造合成事件
 	const se = createSyntheticEvent(e);
-	// 3. 遍历captue
+	//遍历captue
 	triggerEventFlow(capture, se);
-	// 4. 遍历bubble,__stopPropagation为false时
+	// 遍历bubble,__stopPropagation为false时
 	if (!se.__stopPropagation) {
-		// 4. 遍历bubble
+		// 遍历bubble
 		triggerEventFlow(bubble, se);
 	}
 }
 
+/** 按给定顺序执行事件回调，并为事件更新设置对应 Scheduler 优先级。 */
 function triggerEventFlow(paths: EventCallback[], se: SyntheticEvent) {
 	for (let i = 0; i < paths.length; i++) {
 		const callback = paths[i];
@@ -110,6 +120,12 @@ function getEventCallbackNameFromEventType(
 	}[eventType];
 }
 
+/**
+ * 从 target 向 container 回溯，收集捕获和冒泡回调。
+ *
+ * 捕获阶段执行顺序是从外到内，所以使用 unshift；
+ * 冒泡阶段执行顺序是从内到外，所以使用 push。
+ */
 function collectPaths(
 	targetElement: DOMElement,
 	container: Container,

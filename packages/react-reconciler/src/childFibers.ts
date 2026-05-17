@@ -11,7 +11,13 @@ import { ChildDeletion, Placement } from './fiberFlags';
 
 type ExistingChildren = Map<string | number, FiberNode>;
 
-// shouldTrackEffects是否追踪副作用
+/**
+ * 创建子节点协调函数。
+ *
+ * shouldTrackEffects 用来区分 mount 和 update：
+ * - mount 阶段只需要构建 Fiber 树，不需要为每个新节点打 Placement；
+ * - update 阶段需要追踪插入、移动、删除等副作用，供 commit 阶段执行 DOM 操作。
+ */
 function ChildReconciler(shouldTrackEffects: boolean) {
 	// 删除旧的节点
 	function deleteChild(returnFiber: FiberNode, childToDelete: FiberNode) {
@@ -23,7 +29,7 @@ function ChildReconciler(shouldTrackEffects: boolean) {
 		const deletions = returnFiber.deletions;
 		if (deletions === null) {
 			returnFiber.deletions = [childToDelete];
-			// 未要删除的父节点添加删除标记
+			// 为要删除的子节点的父节点添加删除标记
 			returnFiber.flags |= ChildDeletion;
 		} else {
 			deletions.push(childToDelete);
@@ -127,12 +133,18 @@ function ChildReconciler(shouldTrackEffects: boolean) {
 		return fiber;
 	}
 
+	/**
+	 * 多节点 diff。
+	 *
+	 * 当前实现采用 Map 方案：先把旧 children 按 key/index 放入 Map，
+	 * 再遍历新 children 查找可复用节点，并通过 lastPlacedIndex 判断是否需要移动。
+	 */
 	function reconcileChildrenArray(
 		returnFiber: FiberNode,
 		currentFistChild: FiberNode | null,
 		newChild: any[]
 	) {
-		// 最后一个可复用fiber在current中的index
+		// 最后一个“不需要移动”的旧 Fiber 在 current 列表中的 index。
 		let lastPlacedIndex = 0;
 		// 创建的最后一个fiber
 		let lastNewFiber: FiberNode | null = null;
