@@ -45,11 +45,11 @@ tags:
 
 但它没有完整实现这些能力：
 
-| 未实现或不完整 | 为什么要说清楚 |
+| 未实现或不完整 | 当前现状                                                     |
 |---|---|
-| `useReducer`、`useMemo`、`useCallback`、`useLayoutEffect` | 不能把它们作为当前源码的设计依据 |
-| `React.memo`、完整 bailout | 不能说当前源码已经实现了完整“跳过子树优化” |
-| Class Component、Error Boundary、Suspense | 不能把错误恢复、Suspense 并发能力讲成当前源码已有能力 |
+| `useReducer`、`useMemo`、`useCallback`、`useLayoutEffect` | 未实现 |
+| `React.memo`、完整 bailout | 未实现了完整“跳过子树优化” |
+| Class Component、Error Boundary、Suspense | 未实现错误恢复、Suspense 并发能力                            |
 | 完整 Scheduler 包 | 当前是依赖外部 `scheduler`，不是自己实现完整调度器 |
 | 完整跨平台渲染器 | 有 HostConfig 思想，但当前主要落地在 DOM renderer |
 | 完整 React 18 concurrent features | 这份源码演示了时间切片和 `useTransition` 雏形，不等于完整 React 18 |
@@ -403,12 +403,6 @@ removeChild 怎么删除 DOM
 这说明 React 的核心价值并不只是“操作 DOM”，而是：
 
 > 用一套组件模型和协调算法，驱动不同宿主环境。
-
-不过在当前简版源码中，这一点应该谨慎表达：
-
-- 可以说“源码已经体现了平台无关的分层方向”；
-- 不应该说“已经完整支持多平台 renderer”；
-- 更不应该说“新增平台只要实现几十个 HostConfig 方法”这种完整 React 层面的结论。
 
 框架设计启示：
 
