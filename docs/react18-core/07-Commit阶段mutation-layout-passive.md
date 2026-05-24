@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 07：Commit 阶段的 mutation、layout 与 passive
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - Commit阶段
-  - useEffect
----
-
 > 前言：render 阶段负责算出变化，commit 阶段负责把变化真正应用到宿主环境。理解 commit 阶段，是理解 DOM 更新、ref、useEffect 执行时机的关键。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

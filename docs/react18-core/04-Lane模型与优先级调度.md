@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 04：Lane 模型与优先级调度
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - Lane
-  - Scheduler
----
-
 > 前言：React 18 的并发能力离不开优先级。Lane 模型就是 React 用来描述“哪些更新更紧急、哪些更新可以稍后处理”的核心机制。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

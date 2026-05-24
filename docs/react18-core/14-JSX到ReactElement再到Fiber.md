@@ -1,15 +1,3 @@
----
-title: React 18 源码解析 14：从 JSX 到 ReactElement 再到 Fiber
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - JSX
-  - ReactElement
-  - Fiber
----
-
 > 前言：很多人把 JSX、ReactElement、Fiber 混在一起。其实它们是 React 渲染链路中的三个不同阶段：JSX 是语法，ReactElement 是描述对象，Fiber 是可调度工作单元。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

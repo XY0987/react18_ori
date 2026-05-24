@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 06：Diff 算法中的 key、复用、插入与删除
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - Diff
-  - Reconciliation
----
-
 > 前言：React 的 diff 算法并不是简单比较两棵树，而是在 Fiber 架构下，为每个子节点决定“能不能复用”和“需不需要打副作用标记”。这篇重点看子节点协调的核心逻辑。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

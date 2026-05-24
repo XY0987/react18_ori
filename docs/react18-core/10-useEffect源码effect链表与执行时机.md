@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 10：useEffect 源码之 effect 链表与执行时机
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - useEffect
-  - PassiveEffect
----
-
 > 前言：`useEffect` 的难点不在 API 用法，而在它跨越 render 和 commit 两个阶段：render 阶段收集 effect，commit 后再异步执行 destroy/create。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

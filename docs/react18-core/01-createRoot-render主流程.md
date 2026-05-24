@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 01：createRoot().render() 首屏渲染主流程
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - Fiber
-  - Reconciler
----
-
 > 前言：这篇先不钻 `diff`、Hooks、Lane 的细节，只解决一个问题：调用 `ReactDOM.createRoot(root).render(<App />)` 后，React 18 内部的主流程是什么。文中的代码片段来自我的简化实现，用来辅助理解 React 官方源码的核心设计。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

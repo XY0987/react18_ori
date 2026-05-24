@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 16：Scheduler、同步队列与时间切片
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - Scheduler
-  - 时间切片
----
-
 > 前言：Lane 解决的是“哪个更新更重要”，Scheduler 解决的是“任务什么时候执行、能不能让出主线程”。这篇把 `workLoop`、同步任务队列和时间切片串起来看。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

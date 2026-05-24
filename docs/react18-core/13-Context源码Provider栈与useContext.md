@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 13：Context 源码之 Provider 栈与 useContext
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - Context
-  - useContext
----
-
 > 前言：Context 看起来只是跨层传值，但源码里有一个关键点：Provider 可以嵌套，因此 React 需要在 render 过程中维护一套值的入栈和出栈机制。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

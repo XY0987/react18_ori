@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 15：HostConfig 渲染器适配层
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - HostConfig
-  - Renderer
----
-
 > 前言：React 的 reconciler 本身并不关心目标平台是 DOM、Native 还是别的宿主环境。它只负责算出 Fiber 树和副作用，真正创建、插入、删除宿主节点的能力来自 renderer 提供的 HostConfig。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 08：Hooks 原理之 dispatcher 与 Hook 链表
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - Hooks
-  - useState
----
-
 > 前言：Hooks 看起来像普通函数调用，但 React 能让每次调用都拿到对应状态，靠的是 dispatcher、Fiber.memoizedState 上的 Hook 链表，以及严格稳定的调用顺序。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

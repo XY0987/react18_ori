@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 09：useState 源码之 dispatch 与更新队列
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - useState
-  - UpdateQueue
----
-
 > 前言：`useState` 是最常用的 Hook，也是理解 Hooks 更新流程的最好入口。这篇专门拆 `useState`：mount 时如何创建 Hook，dispatch 时如何入队，update 时如何计算新状态。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

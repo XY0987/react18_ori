@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 11：useTransition 源码与 TransitionLane
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - useTransition
-  - TransitionLane
----
-
 > 前言：`useTransition` 是 React 18 并发特性的重要入口。它的关键不是“让代码异步执行”，而是“把一部分更新标记成较低优先级”。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

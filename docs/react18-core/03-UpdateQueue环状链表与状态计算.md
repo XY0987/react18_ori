@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 03：UpdateQueue 环状链表与状态计算
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - UpdateQueue
-  - Hooks
----
-
 > 前言：这篇讲 React 更新系统里一个非常核心但容易被忽略的结构：`UpdateQueue`。我会用简化实现解释它的核心思想，再把它放回 React 18 的更新流程里理解。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

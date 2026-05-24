@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 02：Fiber 数据结构与双缓冲树
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - Fiber
-  - 双缓冲
----
-
 > 前言：上一篇打通了 `createRoot().render()` 的主流程，这篇进入 Fiber 数据结构。先看懂 `FiberNode` 和 `FiberRootNode`，后面理解调度、diff、commit 才有抓手。文中的实现来自我的简化版 React 18，用来辅助理解官方源码的核心思想。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

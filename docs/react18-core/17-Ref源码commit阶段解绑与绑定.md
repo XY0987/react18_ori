@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 17：Ref 源码之 commit 阶段解绑与绑定
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - Ref
-  - Commit阶段
----
-
 > 前言：`ref` 看起来只是拿 DOM 实例，但源码里它横跨 render 和 commit：render 阶段标记 `Ref`，commit 的 mutation 阶段先解绑旧 ref，layout 阶段再绑定新 ref。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`

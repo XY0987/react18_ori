@@ -1,14 +1,3 @@
----
-title: React 18 源码解析 05：render 阶段的 beginWork 与 completeWork
-date: 2026-05-16
-categories:
-  - React源码
-tags:
-  - React18
-  - Fiber
-  - Render阶段
----
-
 > 前言：前面几篇分别讲了主流程、Fiber、UpdateQueue 和 Lane。这篇开始进入 render 阶段，重点看 React 如何通过 `beginWork` 和 `completeWork` 构建一棵新的 Fiber 树。
 
 配套源码仓库：`https://github.com/XY0987/react18_ori.git`
