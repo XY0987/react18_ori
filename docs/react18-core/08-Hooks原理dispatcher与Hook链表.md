@@ -195,6 +195,86 @@ deps 没变
 
 这就是依赖数组能控制 effect 是否重新执行的核心原因。
 
+## useEffect 的执行时机：登记在 render，执行在 commit 后
+
+这里最容易混淆的是：`useEffect` 这个 Hook 调用，和传给 `useEffect` 的回调函数，不是同一个时机执行。
+
+```tsx
+useEffect(() => {
+  // create：这里不是 render 阶段执行
+  return () => {
+    // destroy：这里也不是 render 阶段执行
+  };
+}, [dep]);
+```
+
+函数组件重新执行时，确实会执行到 `useEffect(...)` 这一行，但此时 React 只是做登记：
+
+```text
+render 阶段：
+  执行 FunctionComponent
+    → 调用 useEffect(create, deps)
+    → 比较 deps
+    → pushEffect，把 create/destroy/deps 保存到 effect 环状链表
+    → 如果 deps 变化，给 Fiber 打 PassiveEffect 标记
+```
+
+也就是说，render 阶段执行的是 `useEffect` 这个 Hook API，不是执行用户传入的 `create` 回调。
+
+真正执行 `create/destroy` 发生在 commit 之后的 passive effect flush：
+
+```text
+commit 阶段：
+  mutation：提交 DOM 更新
+  layout：执行 ref / layout 类副作用
+  调度 passive effect
+
+passive 阶段：
+  先执行上一轮 destroy
+  再执行本轮 create
+```
+
+所以普通情况下，可以把 `useEffect` 的时机记成：
+
+```text
+setState
+  → render：重新执行组件，登记本轮 effect
+  → commit mutation：更新 DOM
+  → commit layout：绑定 ref / layout effect
+  → flush passive effects：执行 useEffect destroy/create
+```
+
+一句话：**本轮 `useEffect` 的 create/destroy，一般在本轮 DOM 更新提交之后执行。**
+
+但 React 18 的并发调度里还有一个边界情况：上一轮 commit 后调度的 passive effect 可能还没来得及执行，下一轮任务就开始了。为了避免上一轮 effect 滞后到下一轮 render/commit 之后，`performConcurrentWorkOnRoot` 开头会先补刷一次 pending passive effects。
+
+```text
+commit A：DOM 已更新为 A
+  → 调度 passive effects A
+  → passive A 还没执行
+
+更新 B 开始：
+  performConcurrentWorkOnRoot
+    → 先 flush passive effects A
+    → 再 render B
+    → commit B
+```
+
+因此更严谨的说法是：
+
+> 某一轮 render 产生的 `useEffect`，一定是在这一轮对应的 DOM commit 之后执行；但如果下一轮更新开始前它还没执行，React 会在下一轮 render 前先补 flush 上一轮的 passive effect。
+
+这并不说明 `useEffect` 回调属于 render 阶段。它仍然是 commit 之后的 passive effect，只是可能在下一轮 render 开始前被补执行。
+
+还要注意：`useState` 的 updateQueue 和 `useEffect` 的 effect 链表不是一回事。
+
+| 结构 | 存储内容 | 作用 |
+|------|----------|------|
+| Hook 的 `queue.shared.pending` | `setState` 产生的 update | 下一次 render 时计算新 state |
+| FunctionComponent Fiber 的 `updateQueue.lastEffect` | `useEffect` 产生的 effect 环状链表 | commit 后执行 destroy/create |
+
+所以准确理解应该是：`setState` 触发更新；更新导致函数组件重新执行；重新执行过程中 `useEffect` 登记本轮 effect；DOM 提交后再统一 flush passive effect。
+
 ## useTransition 的本质
 
 简化实现中的 `useTransition` 可以帮助理解核心思想：
@@ -231,3 +311,4 @@ renderWithHooks
 3. React 依赖 Hook 调用顺序复用 Hook，因此 Hook 不能条件调用。
 4. `setState` 创建 update 并调度更新，真正计算状态发生在下一次 render。
 5. `useEffect` 额外维护 effect 环状链表，供 commit 后执行 passive effect。
+6. `useEffect` 的登记发生在 render 阶段，`create/destroy` 的执行发生在 commit 后；如果上一轮 passive effect 没来得及执行，下一轮并发任务开始前会先补 flush。
